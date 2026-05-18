@@ -1,0 +1,1223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>520 · 我只喜欢你</title>
+<style>
+/* ===========================================================
+   CSS 变量 & 全局重置
+   =========================================================== */
+:root {
+  --bg:       #FFF5F7;
+  --pink:     #F8C8DC;
+  --rose:     #D885A3;
+  --text:     #4A4A4A;
+  --pearl:    #FFFBFD;
+  --silver:   #F0E8EC;
+  --gold:     #E8C8B0;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html {
+  scroll-behavior: smooth;
+  scroll-snap-type: y mandatory;
+}
+body {
+  font-family: 'PingFang SC','Microsoft YaHei','Hiragino Sans GB',sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  overflow-x: hidden;
+  cursor: default;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---- 鼠标跟随光晕 ---- */
+#cursorGlow {
+  position:fixed; pointer-events:none; z-index:9999;
+  width:300px; height:300px;
+  border-radius:50%;
+  background: radial-gradient(circle,
+    rgba(248,200,220,0.18) 0%,
+    rgba(248,200,220,0.06) 40%,
+    transparent 70%);
+  transform: translate(-50%,-50%);
+  transition: opacity 0.3s;
+}
+
+/* ---- Canvas 粒子层 ---- */
+#starCanvas, #petalCanvas {
+  position:fixed; top:0; left:0; width:100%; height:100%;
+  pointer-events:none; z-index:0;
+}
+#petalCanvas { z-index:1; }
+
+/* ---- 点击爱心扩散 ---- */
+.click-heart {
+  position:fixed; pointer-events:none; z-index:9998;
+  font-size:20px;
+  animation: clickBurst 1s ease-out forwards;
+}
+@keyframes clickBurst {
+  0%   { transform:translate(-50%,-50%) scale(0.3); opacity:1; }
+  100% { transform:translate(-50%,-50%) scale(2.5); opacity:0; }
+}
+
+/* ---- 区域通用 ---- */
+.section {
+  min-height:100vh; width:100%;
+  display:flex; flex-direction:column;
+  justify-content:center; align-items:center;
+  scroll-snap-align: start;
+  position:relative; z-index:2;
+  padding:40px 24px;
+  text-align:center;
+}
+.section-inner {
+  max-width:600px; width:100%;
+}
+
+/* ---- 右上按钮组 ---- */
+.top-btns {
+  position:fixed; top:20px; right:20px;
+  z-index:100; display:flex; gap:10px;
+}
+.top-btn {
+  width:42px; height:42px;
+  border-radius:50%; border:1.5px solid var(--rose);
+  background:rgba(255,245,247,0.75);
+  cursor:pointer; font-size:18px;
+  display:flex; align-items:center; justify-content:center;
+  backdrop-filter: blur(8px);
+  transition: all 0.3s;
+  color:var(--rose);
+}
+.top-btn:hover { background:var(--pink); }
+.top-btn.off { opacity:0.5; }
+
+/* ---- 编辑按钮 ---- */
+.edit-btn {
+  position:fixed; bottom:28px; right:28px;
+  z-index:101; width:44px; height:44px;
+  border-radius:50%; border:1.5px solid var(--rose);
+  background:rgba(255,245,247,0.8);
+  cursor:pointer; font-size:20px;
+  display:flex; align-items:center; justify-content:center;
+  backdrop-filter: blur(8px);
+  transition: all 0.3s;
+  box-shadow:0 4px 16px rgba(216,133,163,0.15);
+}
+.edit-btn:hover { background:var(--rose); color:#fff; transform:scale(1.08); }
+
+/* ===========================================================
+   编辑器面板
+   =========================================================== */
+.editor-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,0.3);
+  z-index:998; opacity:0; pointer-events:none;
+  transition:opacity 0.35s;
+}
+.editor-overlay.show { opacity:1; pointer-events:auto; }
+
+.editor-panel {
+  position:fixed; top:0; right:-420px;
+  width:400px; max-width:92vw; height:100vh;
+  background:var(--pearl);
+  z-index:999; overflow-y:auto;
+  transition:right 0.4s cubic-bezier(0.4,0,0.2,1);
+  box-shadow:-4px 0 30px rgba(0,0,0,0.08);
+  display:flex; flex-direction:column;
+}
+.editor-panel.show { right:0; }
+
+.editor-header {
+  padding:20px 24px;
+  border-bottom:1px solid var(--silver);
+  display:flex; align-items:center; justify-content:space-between;
+  position:sticky; top:0; background:var(--pearl); z-index:2;
+}
+.editor-header h3 { font-size:18px; color:var(--rose); font-weight:400; letter-spacing:2px; }
+.editor-close {
+  width:32px; height:32px; border-radius:50%;
+  border:1px solid var(--pink); background:none;
+  cursor:pointer; font-size:16px; color:var(--rose);
+  display:flex; align-items:center; justify-content:center;
+  transition:all 0.3s;
+}
+.editor-close:hover { background:var(--pink); }
+
+.editor-tabs {
+  display:flex; border-bottom:1px solid var(--silver);
+  position:sticky; top:64px; background:var(--pearl); z-index:2;
+}
+.editor-tab {
+  flex:1; padding:14px 8px; text-align:center;
+  cursor:pointer; font-size:14px; color:var(--text);
+  border:none; background:none; letter-spacing:1px;
+  transition:all 0.3s; position:relative;
+}
+.editor-tab.active { color:var(--rose); font-weight:500; }
+.editor-tab.active::after {
+  content:''; position:absolute; bottom:0; left:20%; right:20%;
+  height:2px; background:var(--rose); border-radius:1px;
+}
+
+.editor-body { flex:1; padding:20px 24px; overflow-y:auto; }
+
+/* ---- 照片 Tab ---- */
+.photo-slot { margin-bottom:24px; }
+.photo-slot .slot-label {
+  font-size:13px; color:var(--rose); letter-spacing:1px;
+  margin-bottom:8px; font-weight:500;
+}
+.photo-slot .slot-preview {
+  width:100%; height:160px; border-radius:14px;
+  background:linear-gradient(135deg, #FDF0F4, #F8E0EA);
+  display:flex; align-items:center; justify-content:center;
+  overflow:hidden; margin-bottom:10px;
+  border:2px dashed var(--pink); transition:all 0.3s;
+  cursor:pointer; position:relative;
+}
+.photo-slot .slot-preview:hover { border-color:var(--rose); background:#FDF3F6; }
+.photo-slot .slot-preview img { width:100%; height:100%; object-fit:cover; }
+.photo-slot .slot-preview .placeholder-icon { font-size:36px; color:var(--pink); }
+.photo-slot .slot-actions { display:flex; gap:8px; }
+.photo-slot .btn-sm {
+  flex:1; padding:8px; font-size:12px; border-radius:8px;
+  border:1px solid var(--pink); background:#fff;
+  color:var(--rose); cursor:pointer; transition:all 0.3s;
+  letter-spacing:1px; text-align:center;
+}
+.photo-slot .btn-sm:hover { background:var(--pink); }
+.photo-slot .btn-sm.danger { border-color:#E8C0C8; color:#C09098; }
+.photo-slot .btn-sm.danger:hover { background:#FEE8EC; color:#D885A3; }
+
+/* ---- 音乐 Tab ---- */
+.music-section { margin-bottom:24px; }
+.music-section .sec-label {
+  font-size:13px; color:var(--rose); letter-spacing:1px;
+  margin-bottom:8px; font-weight:500;
+}
+.music-section .info-row {
+  font-size:13px; color:var(--text); margin-bottom:6px;
+  line-height:1.6;
+}
+.audio-upload-box {
+  width:100%; padding:28px; border-radius:14px;
+  background:linear-gradient(135deg, #FDF0F4, #F8E0EA);
+  border:2px dashed var(--pink); text-align:center;
+  cursor:pointer; transition:all 0.3s; margin-bottom:20px;
+}
+.audio-upload-box:hover { border-color:var(--rose); background:#FDF3F6; }
+.audio-upload-box .icon { font-size:40px; margin-bottom:8px; }
+.audio-upload-box .text { font-size:14px; color:var(--rose); letter-spacing:1px; }
+.audio-upload-box .hint { font-size:11px; color:var(--text); margin-top:4px; opacity:0.6; }
+
+.music-section input[type="text"] {
+  width:100%; padding:11px 14px; border-radius:10px;
+  border:1px solid var(--pink); background:#fff;
+  font-size:13px; color:var(--text); outline:none;
+  transition:all 0.3s;
+}
+.music-section input[type="text"]:focus { border-color:var(--rose); }
+.music-section .btn-row { display:flex; gap:8px; margin-top:8px; }
+.music-section .btn-sm {
+  flex:1; padding:10px; font-size:12px; border-radius:10px;
+  border:1px solid var(--pink); background:#fff;
+  color:var(--rose); cursor:pointer; transition:all 0.3s;
+  letter-spacing:1px; text-align:center;
+}
+.music-section .btn-sm:hover { background:var(--pink); }
+
+/* 自定义音频播放器 */
+.custom-audio {
+  width:100%; margin-top:12px; display:none;
+}
+.custom-audio.show { display:block; }
+.custom-audio audio { width:100%; height:36px; border-radius:8px; }
+
+/* ---- 文案 Tab ---- */
+.text-field { margin-bottom:18px; }
+.text-field .field-label {
+  font-size:12px; color:var(--rose); letter-spacing:1px;
+  margin-bottom:5px; font-weight:500; text-transform:uppercase;
+}
+.text-field textarea, .text-field input[type="text"] {
+  width:100%; padding:10px 14px; border-radius:10px;
+  border:1px solid var(--silver); background:#fff;
+  font-size:14px; color:var(--text); outline:none;
+  resize:vertical; font-family:inherit; line-height:1.6;
+  transition:all 0.3s;
+}
+.text-field textarea:focus, .text-field input[type="text"]:focus {
+  border-color:var(--pink);
+}
+.text-field textarea { min-height:70px; }
+.editor-body .btn-primary {
+  width:100%; padding:12px; font-size:14px; border-radius:12px;
+  border:none; background:linear-gradient(135deg, #D885A3, #C87090);
+  color:#fff; cursor:pointer; letter-spacing:2px;
+  transition:all 0.3s; margin-top:8px;
+}
+.editor-body .btn-primary:hover { box-shadow:0 6px 20px rgba(216,133,163,0.3); }
+
+.save-toast {
+  position:fixed; bottom:100px; left:50%; transform:translateX(-50%);
+  background:var(--rose); color:#fff; padding:10px 28px;
+  border-radius:20px; font-size:13px; letter-spacing:2px;
+  z-index:9999; opacity:0; transition:opacity 0.4s;
+  pointer-events:none;
+}
+.save-toast.show { opacity:1; }
+
+/* ===========================================================
+   封面页 — Section 1
+   =========================================================== */
+.cover {
+  background: linear-gradient(180deg,
+    #FFF5F7 0%, #FBE0E8 30%, #F8D0DC 60%, #FFF5F7 100%);
+}
+.cover .big-date {
+  font-size: 90px; font-weight:200;
+  background: linear-gradient(135deg, #D885A3, #C06080, #D885A3);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  background-clip:text;
+  letter-spacing:8px;
+  animation: breathe 3s ease-in-out infinite;
+  margin-bottom:8px;
+}
+@keyframes breathe {
+  0%,100%{transform:scale(1)}
+  50%{transform:scale(1.04)}
+}
+.cover .sub-text {
+  font-size:18px; color:var(--rose); letter-spacing:12px;
+  margin-bottom:40px; font-weight:300;
+  opacity:0; animation: fadeUp 1.2s 0.4s forwards;
+}
+.cover .enter-btn {
+  display:inline-block; padding:14px 50px;
+  border:1.5px solid var(--rose);
+  border-radius:30px;
+  color:var(--rose); font-size:16px; letter-spacing:4px;
+  cursor:pointer; text-decoration:none;
+  background:rgba(255,255,255,0.5);
+  backdrop-filter:blur(4px);
+  transition:all 0.4s;
+  opacity:0; animation: fadeUp 1.2s 0.8s forwards;
+}
+.cover .enter-btn:hover {
+  background:var(--rose); color:#fff;
+  box-shadow:0 8px 30px rgba(216,133,163,0.35);
+}
+@keyframes fadeUp {
+  from{opacity:0;transform:translateY(20px)}
+  to{opacity:1;transform:translateY(0)}
+}
+
+/* ===========================================================
+   相遇页 — Section 2
+   =========================================================== */
+.meet { background:var(--pearl); }
+.meet .section-title {
+  font-size:32px; font-weight:300; color:var(--rose);
+  letter-spacing:6px; margin-bottom:40px;
+}
+.meet .meet-card {
+  background:rgba(255,255,255,0.7);
+  border:1px solid rgba(248,200,220,0.5);
+  border-radius:20px; padding:36px 28px;
+  backdrop-filter:blur(10px);
+  box-shadow:0 8px 40px rgba(216,133,163,0.08);
+}
+.meet .meet-card .icon-row { font-size:40px; margin-bottom:16px; }
+.meet .meet-card .line {
+  font-size:15px; color:var(--text); line-height:2.2; letter-spacing:1px;
+}
+.meet .meet-card .line em {
+  font-style:normal; color:var(--rose); font-weight:500;
+}
+.photo-circle {
+  width:140px; height:140px; border-radius:50%;
+  background:linear-gradient(135deg, #F8C8DC, #E8B8C8);
+  margin:24px auto 0;
+  overflow:hidden;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:0 6px 24px rgba(216,133,163,0.2);
+}
+.photo-circle img { width:100%; height:100%; border-radius:50%; object-fit:cover; }
+.photo-circle .placeholder-icon { font-size:48px; opacity:0.8; }
+
+/* ===========================================================
+   心动页 — Section 3
+   =========================================================== */
+.reasons { background:linear-gradient(180deg, #FFF5F7, #FFFBFD, #FFF5F7); }
+.reasons .section-title {
+  font-size:28px; font-weight:300; color:var(--rose);
+  letter-spacing:4px; margin-bottom:32px;
+}
+.reasons .reason-list {
+  display:flex; flex-direction:column; gap:16px; width:100%;
+}
+.reasons .reason-item {
+  background:rgba(255,255,255,0.65);
+  border-radius:16px; padding:18px 22px;
+  text-align:left; font-size:15px; line-height:1.7;
+  backdrop-filter:blur(6px);
+  border-left:3px solid var(--pink);
+  transition:all 0.3s;
+}
+.reasons .reason-item:hover {
+  transform:translateX(4px);
+  border-left-color:var(--rose);
+  box-shadow:0 4px 20px rgba(216,133,163,0.1);
+}
+.reasons .reason-item .num {
+  display:inline-block; width:26px; height:26px;
+  border-radius:50%; background:var(--pink);
+  color:#fff; text-align:center; line-height:26px;
+  font-size:13px; margin-right:10px;
+}
+
+/* ===========================================================
+   回忆页 — Section 4 (时间轴)
+   =========================================================== */
+.memories { background:var(--pearl); }
+.memories .section-title {
+  font-size:28px; font-weight:300; color:var(--rose);
+  letter-spacing:4px; margin-bottom:36px;
+}
+.timeline {
+  position:relative; width:100%;
+}
+.timeline::before {
+  content:''; position:absolute;
+  left:24px; top:0; bottom:0;
+  width:1.5px;
+  background:linear-gradient(180deg, var(--pink), var(--rose), var(--pink));
+}
+.timeline-item {
+  position:relative; padding-left:52px; margin-bottom:28px;
+  text-align:left;
+}
+.timeline-item::before {
+  content:''; position:absolute;
+  left:18px; top:6px;
+  width:13px; height:13px;
+  border-radius:50%;
+  background:var(--rose);
+  box-shadow:0 0 0 5px rgba(248,200,220,0.35);
+}
+.timeline-item .t-date { font-size:12px; color:var(--rose); letter-spacing:2px; margin-bottom:4px; }
+.timeline-item .t-text { font-size:15px; color:var(--text); line-height:1.6; }
+.timeline-photo {
+  margin-top:10px; width:100%; max-width:260px;
+  border-radius:12px; overflow:hidden;
+  box-shadow:0 4px 16px rgba(216,133,163,0.15);
+  background:linear-gradient(135deg,#F8C8DC,#E8D0D8);
+  min-height:120px; display:flex; align-items:center; justify-content:center;
+}
+.timeline-photo img { width:100%; display:block; object-fit:cover; }
+.timeline-photo .placeholder-icon { font-size:32px; opacity:0.8; color:#fff; }
+
+/* ===========================================================
+   告白页 — Section 5
+   =========================================================== */
+.confess {
+  background:linear-gradient(180deg,
+    #FBE0E8 0%, #F8D0DC 30%, #F5C8D6 60%, #FBE0E8 100%);
+}
+.confess .poem {
+  font-size:20px; line-height:2.5; letter-spacing:2px;
+  color:var(--text); font-weight:300;
+}
+.confess .poem .highlight {
+  display:block; font-size:28px; color:var(--rose);
+  font-weight:400; margin-top:20px; letter-spacing:6px;
+}
+.confess .heart-icon {
+  font-size:56px; margin-top:24px;
+  animation: breathe 2s ease-in-out infinite;
+}
+
+/* ===========================================================
+   结尾页 — Section 6
+   =========================================================== */
+.ending { background:var(--pearl); }
+.ending .promise {
+  font-size:18px; line-height:2.4; color:var(--text);
+  letter-spacing:2px; margin-bottom:36px; font-weight:300;
+}
+.ending .will-btn {
+  display:inline-block; padding:16px 54px;
+  background:linear-gradient(135deg, #D885A3, #C87090);
+  color:#fff; font-size:20px; letter-spacing:6px;
+  border:none; border-radius:32px; cursor:pointer;
+  box-shadow:0 8px 30px rgba(216,133,163,0.3);
+  transition:all 0.4s;
+  position:relative; overflow:hidden;
+}
+.ending .will-btn:hover {
+  transform:translateY(-3px) scale(1.03);
+  box-shadow:0 12px 40px rgba(216,133,163,0.45);
+}
+.ending .will-btn:active { transform:scale(0.96); }
+.ending .will-btn .ripple {
+  position:absolute; border-radius:50%;
+  background:rgba(255,255,255,0.5);
+  animation:ripple 0.7s ease-out forwards;
+}
+@keyframes ripple {
+  from{width:0;height:0;opacity:1}
+  to{width:300px;height:300px;opacity:0;margin-left:-150px;margin-top:-150px}
+}
+
+/* 结尾弹窗 */
+.final-toast {
+  position:fixed; top:50%; left:50%; transform:translate(-50%,-50%) scale(0);
+  background:rgba(255,255,255,0.95);
+  border-radius:20px; padding:36px 30px;
+  z-index:200; text-align:center;
+  backdrop-filter:blur(16px);
+  border:1px solid rgba(248,200,220,0.5);
+  box-shadow:0 20px 60px rgba(216,133,163,0.2);
+  transition:transform 0.5s cubic-bezier(0.34,1.56,0.64,1);
+}
+.final-toast.show { transform:translate(-50%,-50%) scale(1); }
+.final-toast h2 { font-size:28px; color:var(--rose); margin-bottom:12px; font-weight:400; }
+.final-toast p  { font-size:16px; color:var(--text); line-height:1.8; }
+.final-toast .close-toast {
+  display:inline-block; margin-top:18px; padding:8px 28px;
+  border:1px solid var(--rose); border-radius:20px;
+  color:var(--rose); cursor:pointer; letter-spacing:2px;
+  transition:all 0.3s; font-size:14px;
+}
+.final-toast .close-toast:hover { background:var(--rose); color:#fff; }
+.toast-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,0.3);
+  z-index:199; opacity:0; pointer-events:none;
+  transition:opacity 0.5s;
+}
+.toast-overlay.show { opacity:1; pointer-events:auto; }
+
+/* ===========================================================
+   滚动渐显 & 可编辑标记
+   =========================================================== */
+.reveal {
+  opacity:0; transform:translateY(30px);
+  transition:opacity 0.8s ease, transform 0.8s ease;
+}
+.reveal.visible { opacity:1; transform:translateY(0); }
+
+[data-edit]:hover {
+  outline:1.5px dashed rgba(216,133,163,0.2);
+  outline-offset:3px; border-radius:4px;
+}
+
+/* ===========================================================
+   响应式
+   =========================================================== */
+@media (max-width: 600px) {
+  .cover .big-date { font-size:56px; }
+  .cover .sub-text { font-size:14px; letter-spacing:6px; }
+  .meet .section-title,
+  .reasons .section-title,
+  .memories .section-title { font-size:22px; }
+  .confess .poem { font-size:16px; }
+  .confess .poem .highlight { font-size:22px; }
+  .meet .meet-card { padding:24px 18px; }
+  .ending .will-btn { padding:14px 40px; font-size:17px; }
+  .timeline-item { padding-left:42px; }
+  .editor-panel { width:100%; max-width:100vw; right:-100vw; }
+}
+</style>
+</head>
+<body>
+
+<div id="cursorGlow"></div>
+<canvas id="starCanvas"></canvas>
+<canvas id="petalCanvas"></canvas>
+
+<!-- 右上按钮组 -->
+<div class="top-btns">
+  <button class="top-btn" id="musicBtn" title="音乐开关">🎵</button>
+</div>
+
+<!-- 编辑按钮 -->
+<button class="edit-btn" id="editBtn" title="编辑内容">✎</button>
+
+<!-- ===========================================================
+     编辑面板
+     =========================================================== -->
+<div class="editor-overlay" id="editorOverlay"></div>
+<div class="editor-panel" id="editorPanel">
+  <div class="editor-header">
+    <h3>✨ 编辑内容</h3>
+    <button class="editor-close" id="editorClose">✕</button>
+  </div>
+  <div class="editor-tabs">
+    <button class="editor-tab active" data-tab="photos">📷 照片</button>
+    <button class="editor-tab" data-tab="music">🎵 音乐</button>
+    <button class="editor-tab" data-tab="text">✏️ 文案</button>
+  </div>
+  <div class="editor-body" id="editorBody">
+    <!-- 动态填充 -->
+  </div>
+</div>
+<div class="save-toast" id="saveToast">已保存 ✓</div>
+
+<!-- ===========================================================
+     封面页
+     =========================================================== -->
+<section class="section cover" id="sec1">
+  <div class="section-inner">
+    <div class="big-date" data-edit="cover-big">520</div>
+    <p class="sub-text" data-edit="cover-sub">遇 见 你 · 很 幸 运</p>
+    <a href="#sec2" class="enter-btn" data-edit="cover-btn">轻 触 开 启</a>
+  </div>
+</section>
+
+<!-- ===========================================================
+     相遇页
+     =========================================================== -->
+<section class="section meet" id="sec2">
+  <div class="section-inner reveal">
+    <div class="section-title" data-edit="meet-title">✨  初 次 相 遇</div>
+    <div class="meet-card reveal">
+      <div class="icon-row">🌙</div>
+      <p class="line" data-edit="meet-detail">
+        时间：<em>2023 年 3 月 15 日</em><br>
+        地点：<em>图书馆三楼靠窗的位置</em><br>
+        天气：<em>阳光温柔，微风不燥</em><br>
+        那一刻：<em>你低头看书的样子，<br>让整个世界都安静了下来。</em>
+      </p>
+      <div class="photo-circle reveal" id="photoMeet">
+        <span class="placeholder-icon">📷</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===========================================================
+     心动页
+     =========================================================== -->
+<section class="section reasons" id="sec3">
+  <div class="section-inner">
+    <div class="section-title reveal" data-edit="reasons-title">💗  喜欢你的 N 个理由</div>
+    <div class="reason-list" id="reasonList">
+      <div class="reason-item reveal" data-edit="reason-1"><span class="num">1</span> 你笑的时候，眼睛里藏着星星。</div>
+      <div class="reason-item reveal" data-edit="reason-2"><span class="num">2</span> 你认真说话时，会不自觉地轻轻歪头。</div>
+      <div class="reason-item reveal" data-edit="reason-3"><span class="num">3</span> 你记得我说过的每一件小事，哪怕我自己都忘了。</div>
+      <div class="reason-item reveal" data-edit="reason-4"><span class="num">4</span> 你总是把伞偏向我这边，自己淋湿半个肩膀。</div>
+      <div class="reason-item reveal" data-edit="reason-5"><span class="num">5</span> 和你在一起的时候，连沉默都很舒服。</div>
+      <div class="reason-item reveal" data-edit="reason-6"><span class="num">6</span> 是你让我相信，温柔本身就是一种力量。</div>
+      <div class="reason-item reveal" data-edit="reason-7"><span class="num">7</span> 还有好多好多……剩下的，我用一辈子慢慢说给你听。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ===========================================================
+     回忆页
+     =========================================================== -->
+<section class="section memories" id="sec4">
+  <div class="section-inner">
+    <div class="section-title reveal" data-edit="memories-title">📖  我 们 的 故 事</div>
+    <div class="timeline" id="timeline">
+      <div class="timeline-item reveal">
+        <div class="t-date" data-edit="tl-date-1">2023 / 03 / 15</div>
+        <div class="t-text" data-edit="tl-text-1">第一次在图书馆遇见你，你借了一本《小王子》。</div>
+      </div>
+      <div class="timeline-item reveal">
+        <div class="t-date" data-edit="tl-date-2">2023 / 04 / 08</div>
+        <div class="t-text" data-edit="tl-text-2">一起看了第一场电影，散场后走了三站地铁的路，谁也不舍得先回家。</div>
+      </div>
+      <div class="timeline-item reveal">
+        <div class="t-date" data-edit="tl-date-3">2023 / 06 / 20</div>
+        <div class="t-text" data-edit="tl-text-3">你生日那天，在海边等到了凌晨四点的日出。你说那是你收到过最好的礼物。</div>
+        <div class="timeline-photo" id="photoTimeline">
+          <span class="placeholder-icon">📸</span>
+        </div>
+      </div>
+      <div class="timeline-item reveal">
+        <div class="t-date" data-edit="tl-date-4">2023 / 12 / 31</div>
+        <div class="t-text" data-edit="tl-text-4">跨年夜，我们在天台上看烟花。你许了什么愿？——"希望明年身边还是你。"</div>
+      </div>
+      <div class="timeline-item reveal">
+        <div class="t-date" data-edit="tl-date-5">2024 / 02 / 14</div>
+        <div class="t-text" data-edit="tl-text-5">你偷偷学了一个月的烘焙，给我做了一个歪歪扭扭的草莓蛋糕。那是我吃过最好吃的甜点。</div>
+      </div>
+      <div class="timeline-item reveal">
+        <div class="t-date" data-edit="tl-date-6">2024 / 05 / 20</div>
+        <div class="t-text" data-edit="tl-text-6" style="color:var(--rose);font-weight:500;">今天，我想把"我们"的故事，写进更远的未来。</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===========================================================
+     告白页
+     =========================================================== -->
+<section class="section confess" id="sec5">
+  <div class="section-inner">
+    <div class="poem reveal" data-edit="poem">
+      我曾以为<br>
+      浪漫是玫瑰，是烟火，<br>
+      是夏夜的流星。<br>
+      <br>
+      直到遇见你才发现，<br>
+      浪漫是清晨你给我热的那杯牛奶，<br>
+      是过马路时你牵起我的手，<br>
+      是你看我时眼里藏不住的笑意。<br>
+      <br>
+      所以我想对你说——<br>
+      <span class="highlight">我 喜 欢 你</span>
+    </div>
+    <div class="heart-icon reveal">💝</div>
+  </div>
+</section>
+
+<!-- ===========================================================
+     结尾页
+     =========================================================== -->
+<section class="section ending" id="sec6">
+  <div class="section-inner">
+    <div class="promise reveal" data-edit="promise">
+      往后的日子，<br>
+      春天一起看樱花，<br>
+      夏天一起吹晚风，<br>
+      秋天一起踩落叶，<br>
+      冬天一起喝热可可。<br>
+      <br>
+      我可能不是最完美的人，<br>
+      但我会是最努力爱你的人。<br>
+    </div>
+    <button class="will-btn reveal" id="willBtn" data-edit="will-btn">
+      💍 我 愿 意
+    </button>
+  </div>
+</section>
+
+<div class="toast-overlay" id="toastOverlay"></div>
+<div class="final-toast" id="finalToast">
+  <h2 data-edit="toast-title">💖 谢谢你愿意</h2>
+  <p data-edit="toast-msg">
+    从今天起，<br>
+    你是我最温柔的牵挂，<br>
+    也是我最确定的答案。<br>
+    <br>
+    520 快乐 🌸
+  </p>
+  <span class="close-toast" id="closeToast">💕 好</span>
+</div>
+
+<!-- 隐藏文件 input -->
+<input type="file" accept="image/*" id="hiddenFileInput" style="display:none">
+<input type="file" accept="audio/*" id="hiddenAudioInput" style="display:none">
+
+<script>
+(function(){
+  /* =========================================================
+     鼠标光晕
+     ========================================================= */
+  const glow=document.getElementById('cursorGlow');
+  let mX=-200,mY=-200,cX=-200,cY=-200;
+  document.addEventListener('mousemove',e=>{mX=e.clientX;mY=e.clientY;});
+  document.addEventListener('mouseleave',()=>{mX=-200;mY=-200;});
+
+  /* =========================================================
+     点击爱心扩散 (排除编辑器区域)
+     ========================================================= */
+  document.addEventListener('click',e=>{
+    if(e.target.closest('#editorPanel')||e.target.closest('#editorOverlay')||
+       e.target.closest('#editBtn')||e.target.closest('.top-btn')||
+       e.target.closest('#finalToast')||e.target.closest('#toastOverlay')) return;
+    const h=document.createElement('span');
+    h.className='click-heart';
+    h.textContent=['❤️','💕','💗','💖','✨','🌸'][Math.floor(Math.random()*6)];
+    h.style.left=e.clientX+'px'; h.style.top=e.clientY+'px';
+    h.style.fontSize=(Math.random()*16+18)+'px';
+    document.body.appendChild(h);
+    setTimeout(()=>h.remove(),1000);
+  });
+
+  /* =========================================================
+     星光 Canvas
+     ========================================================= */
+  const sCvs=document.getElementById('starCanvas'), sCtx=sCvs.getContext('2d');
+  let sW,sH;
+  function rStar(){sW=sCvs.width=window.innerWidth;sH=sCvs.height=window.innerHeight;}
+  window.addEventListener('resize',rStar);rStar();
+  const stars=[];
+  for(let i=0;i<80;i++)stars.push({x:Math.random()*sW,y:Math.random()*sH,r:Math.random()*1.5+0.3,spd:Math.random()*1.2+0.3,op:Math.random()*0.6+0.2,ph:Math.random()*Math.PI*2,blink:Math.random()*0.02+0.005});
+  function drawStars(ts){
+    sCtx.clearRect(0,0,sW,sH);
+    stars.forEach(s=>{
+      s.y+=s.spd;if(s.y>sH+10){s.y=-10;s.x=Math.random()*sW;}
+      const tw=Math.sin(ts*s.blink+s.ph),a=(0.4+0.6*tw)*s.op;
+      sCtx.save();sCtx.globalAlpha=a;
+      const g=sCtx.createRadialGradient(s.x,s.y,0,s.x,s.y,s.r*3);
+      g.addColorStop(0,'#fff');g.addColorStop(0.5,'#F8E8F0');g.addColorStop(1,'transparent');
+      sCtx.fillStyle=g;sCtx.beginPath();sCtx.arc(s.x,s.y,s.r*3,0,Math.PI*2);sCtx.fill();
+      sCtx.fillStyle='rgba(255,255,255,0.9)';sCtx.beginPath();sCtx.arc(s.x,s.y,s.r*0.5,0,Math.PI*2);sCtx.fill();
+      sCtx.restore();
+    });
+  }
+
+  /* =========================================================
+     花瓣 Canvas
+     ========================================================= */
+  const pCvs=document.getElementById('petalCanvas'), pCtx=pCvs.getContext('2d');
+  let pW,pH;
+  function rPetal(){pW=pCvs.width=window.innerWidth;pH=pCvs.height=window.innerHeight;}
+  window.addEventListener('resize',rPetal);rPetal();
+  const petals=[];
+  for(let i=0;i<35;i++)petals.push({x:Math.random()*pW,y:Math.random()*pH,r:Math.random()*5+3,spd:Math.random()*0.6+0.2,sway:Math.random()*1.5+0.5,swaySpd:Math.random()*0.015+0.005,ph:Math.random()*Math.PI*2,rot:Math.random()*360,rotSpd:(Math.random()-0.5)*0.8,op:Math.random()*0.5+0.25});
+  function drawPetals(ts){
+    pCtx.clearRect(0,0,pW,pH);
+    petals.forEach(p=>{
+      p.y+=p.spd;p.x+=Math.sin(ts*p.swaySpd+p.ph)*p.sway*0.3;p.rot+=p.rotSpd;
+      if(p.y>pH+20){p.y=-20;p.x=Math.random()*pW;}
+      if(p.x<-20)p.x=pW+20;if(p.x>pW+20)p.x=-20;
+      pCtx.save();pCtx.globalAlpha=p.op;
+      pCtx.translate(p.x,p.y);pCtx.rotate(p.rot*Math.PI/180);
+      const g=pCtx.createRadialGradient(0,0,0,0,-p.r*0.6,p.r*1.5);
+      g.addColorStop(0,'#FAD0DC');g.addColorStop(0.6,'#F8C8DC');g.addColorStop(1,'transparent');
+      pCtx.fillStyle=g;pCtx.beginPath();pCtx.ellipse(0,0,p.r,p.r*0.55,0,0,Math.PI*2);pCtx.fill();
+      pCtx.restore();
+    });
+  }
+
+  /* =========================================================
+     滚动渐显
+     ========================================================= */
+  const observer=new IntersectionObserver(entries=>{
+    entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('visible');});
+  },{threshold:0.2});
+  document.querySelectorAll('.reveal').forEach(el=>observer.observe(el));
+
+  /* =========================================================
+     结尾弹窗
+     ========================================================= */
+  const willBtn=document.getElementById('willBtn');
+  const overlay=document.getElementById('toastOverlay');
+  const toast=document.getElementById('finalToast');
+  const closeToast=document.getElementById('closeToast');
+
+  willBtn.addEventListener('click',function(e){
+    const ripple=document.createElement('span');ripple.className='ripple';
+    const rect=this.getBoundingClientRect();
+    ripple.style.left=(e.clientX-rect.left)+'px';ripple.style.top=(e.clientY-rect.top)+'px';
+    this.appendChild(ripple);setTimeout(()=>ripple.remove(),700);
+    setTimeout(()=>{overlay.classList.add('show');toast.classList.add('show');spawnHearts();},400);
+  });
+  closeToast.addEventListener('click',()=>{overlay.classList.remove('show');toast.classList.remove('show');spawnHearts();});
+  overlay.addEventListener('click',()=>{overlay.classList.remove('show');toast.classList.remove('show');});
+
+  function spawnHearts(){
+    const emojis=['❤️','💕','💗','💖','💘','💝','💓','💞','✨','🌸'];
+    for(let i=0;i<30;i++){setTimeout(()=>{
+      const el=document.createElement('span');el.className='click-heart';
+      el.textContent=emojis[Math.floor(Math.random()*emojis.length)];
+      el.style.left=Math.random()*100+'%';el.style.top=Math.random()*100+'%';
+      el.style.fontSize=(Math.random()*24+20)+'px';el.style.animationDuration=(Math.random()*1.5+1)+'s';
+      document.body.appendChild(el);setTimeout(()=>el.remove(),2000);
+    },i*60);}
+  }
+
+  /* =========================================================
+     音乐系统 (Web Audio + 自定义音频文件)
+     ========================================================= */
+  let audioCtx=null, musicOn=false, customAudio=null;
+  const musicBtn=document.getElementById('musicBtn');
+
+  function startWebAudio(){
+    if(audioCtx||customAudio)return;
+    audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    const chords=[[261.63,329.63,392.00],[293.66,369.99,440.00],[261.63,329.63,440.00],[261.63,349.23,392.00]];
+    let ci=0;
+    function playChord(){
+      if(!musicOn||!audioCtx||customAudio)return;
+      const now=audioCtx.currentTime;
+      chords[ci%chords.length].forEach(f=>{
+        const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+        o.type='sine';o.frequency.value=f;
+        g.gain.setValueAtTime(0,now);g.gain.linearRampToValueAtTime(0.04,now+0.6);g.gain.linearRampToValueAtTime(0.03,now+3.5);g.gain.linearRampToValueAtTime(0,now+4.0);
+        o.connect(g);g.connect(audioCtx.destination);o.start(now);o.stop(now+4.2);
+      });ci++;
+    }
+    playChord();
+    const iv=setInterval(()=>{if(!musicOn||!audioCtx||customAudio){clearInterval(iv);return;}playChord();},4000);
+    // Pad
+    if(!customAudio){
+      const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+      o.type='sine';o.frequency.value=130.81;g.gain.setValueAtTime(0.012,audioCtx.currentTime);
+      o.connect(g);g.connect(audioCtx.destination);o.start();
+    }
+  }
+
+  function stopWebAudio(){
+    if(audioCtx){audioCtx.close();audioCtx=null;}
+  }
+
+  // 加载自定义音频
+  function playCustomAudio(){
+    if(customAudio){
+      customAudio.play().catch(()=>{});
+    }
+  }
+  function pauseCustomAudio(){
+    if(customAudio){customAudio.pause();}
+  }
+
+  musicBtn.addEventListener('click',()=>{
+    musicOn=!musicOn;
+    if(musicOn){
+      musicBtn.textContent='🎵';musicBtn.classList.remove('off');
+      if(customAudio){playCustomAudio();}
+      else {startWebAudio();}
+    }else{
+      musicBtn.textContent='🔇';musicBtn.classList.add('off');
+      if(customAudio){pauseCustomAudio();}
+      else {stopWebAudio();}
+    }
+  });
+
+  document.addEventListener('click',function initAudio(){
+    if(!musicOn){musicOn=true;if(!customAudio)startWebAudio();else playCustomAudio();}
+  },{once:true});
+
+  /* =========================================================
+     编辑器系统
+     ========================================================= */
+  const editBtn=document.getElementById('editBtn');
+  const editorPanel=document.getElementById('editorPanel');
+  const editorOverlay=document.getElementById('editorOverlay');
+  const editorClose=document.getElementById('editorClose');
+  const editorBody=document.getElementById('editorBody');
+  const saveToast=document.getElementById('saveToast');
+
+  function openEditor(){editorPanel.classList.add('show');editorOverlay.classList.add('show');}
+  function closeEditor(){editorPanel.classList.remove('show');editorOverlay.classList.remove('show');}
+  editBtn.addEventListener('click',openEditor);
+  editorClose.addEventListener('click',closeEditor);
+  editorOverlay.addEventListener('click',closeEditor);
+
+  function showToast(){
+    saveToast.classList.add('show');
+    setTimeout(()=>saveToast.classList.remove('show'),1800);
+  }
+
+  // --- Tab 切换 ---
+  document.querySelectorAll('.editor-tab').forEach(tab=>{
+    tab.addEventListener('click',function(){
+      document.querySelectorAll('.editor-tab').forEach(t=>t.classList.remove('active'));
+      this.classList.add('active');
+      renderTab(this.dataset.tab);
+    });
+  });
+
+  // --- 照片数据 ---
+  // { slotKey: dataURL | null }
+  let photos={};
+  try{photos=JSON.parse(localStorage.getItem('love520_photos')||'{}');}catch(e){photos={};}
+
+  function savePhotos(){try{localStorage.setItem('love520_photos',JSON.stringify(photos));}catch(e){}}
+
+  function loadPhotoToDOM(key,containerId){
+    const el=document.getElementById(containerId);
+    if(!el)return;
+    if(photos[key]){
+      el.innerHTML='';const img=document.createElement('img');img.src=photos[key];el.appendChild(img);
+    }
+  }
+
+  function triggerPhotoUpload(key,containerId){
+    const inp=document.getElementById('hiddenFileInput');
+    inp.dataset.photoKey=key;inp.dataset.containerId=containerId;
+    inp.click();
+  }
+
+  document.getElementById('hiddenFileInput').addEventListener('change',function(){
+    const file=this.files[0];if(!file)return;
+    const key=this.dataset.photoKey, cid=this.dataset.containerId;
+    const reader=new FileReader();
+    reader.onload=function(){
+      photos[key]=reader.result;savePhotos();loadPhotoToDOM(key,cid);
+      renderTab('photos');showToast();
+    };
+    reader.readAsDataURL(file);this.value='';
+  });
+
+  function removePhoto(key,containerId){
+    delete photos[key];savePhotos();
+    const el=document.getElementById(containerId);
+    if(el){
+      el.innerHTML='<span class="placeholder-icon">📷</span>';
+    }
+    renderTab('photos');showToast();
+  }
+
+  // 初始加载照片
+  loadPhotoToDOM('meet','photoMeet');
+  loadPhotoToDOM('timeline','photoTimeline');
+
+  // --- 文案数据 ---
+  let texts={};
+  try{texts=JSON.parse(localStorage.getItem('love520_texts')||'{}');}catch(e){texts={};}
+
+  function saveTexts(){try{localStorage.setItem('love520_texts',JSON.stringify(texts));}catch(e){}}
+
+  function loadAllTexts(){
+    document.querySelectorAll('[data-edit]').forEach(el=>{
+      const key=el.dataset.edit;
+      if(texts[key]!==undefined){
+        if(el.tagName==='INPUT'||el.tagName==='TEXTAREA'){el.value=texts[key];}
+        else {el.innerHTML=texts[key];}
+      }
+    });
+    // 特殊处理原因列表
+    for(let i=1;i<=7;i++){
+      const el=document.querySelector(`[data-edit="reason-${i}"]`);
+      if(el&&texts[`reason-${i}`]!==undefined){
+        const numSpan=el.querySelector('.num');
+        const num=numSpan?numSpan.outerHTML:'';
+        el.innerHTML=num+texts[`reason-${i}`];
+      }
+    }
+  }
+
+  // 从 DOM 收集当前文案
+  function collectTextFromDOM(key){
+    const el=document.querySelector(`[data-edit="${key}"]`);
+    if(!el)return;
+    if(key.startsWith('reason-')){
+      const numSpan=el.querySelector('.num');
+      const numHTML=numSpan?numSpan.outerHTML:'';
+      texts[key]=el.innerHTML.replace(numHTML,'').trim();
+    } else {
+      texts[key]=el.innerHTML;
+    }
+  }
+
+  loadAllTexts();
+
+  // --- 音乐数据 ---
+  let musicURL=localStorage.getItem('love520_music_url')||'';
+  let musicName=localStorage.getItem('love520_music_name')||'';
+
+  function triggerAudioUpload(){
+    document.getElementById('hiddenAudioInput').click();
+  }
+
+  document.getElementById('hiddenAudioInput').addEventListener('change',function(){
+    const file=this.files[0];if(!file)return;
+    if(customAudio){customAudio.pause();customAudio=null;}
+    stopWebAudio();
+    musicURL=URL.createObjectURL(file);
+    musicName=file.name;
+    localStorage.setItem('love520_music_url',musicURL);
+    localStorage.setItem('love520_music_name',musicName);
+    customAudio=new Audio(musicURL);
+    customAudio.loop=true;customAudio.volume=0.35;
+    if(musicOn)customAudio.play().catch(()=>{});
+    renderTab('music');showToast();
+    this.value='';
+  });
+
+  function applyMusicURL(){
+    const input=document.getElementById('musicURLInput');
+    if(!input||!input.value.trim())return;
+    const url=input.value.trim();
+    if(customAudio){customAudio.pause();customAudio=null;}
+    stopWebAudio();
+    musicURL=url;musicName='自定义链接';
+    localStorage.setItem('love520_music_url',musicURL);
+    localStorage.setItem('love520_music_name',musicName);
+    customAudio=new Audio(musicURL);
+    customAudio.loop=true;customAudio.volume=0.35;
+    if(musicOn)customAudio.play().catch(()=>{});
+    renderTab('music');showToast();
+  }
+
+  function resetMusic(){
+    if(customAudio){customAudio.pause();customAudio=null;}
+    musicURL='';musicName='';
+    localStorage.removeItem('love520_music_url');
+    localStorage.removeItem('love520_music_name');
+    if(musicOn){
+      startWebAudio();
+    } else {
+      stopWebAudio();
+    }
+    renderTab('music');showToast();
+  }
+
+  // 初始化音乐
+  if(musicURL){
+    customAudio=new Audio(musicURL);
+    customAudio.loop=true;customAudio.volume=0.35;
+  }
+
+  // --- 渲染编辑器 ---
+  function renderTab(tab){
+    if(tab==='photos'){
+      const meetHas=!!photos['meet'];
+      const tlHas=!!photos['timeline'];
+      editorBody.innerHTML=`
+        <div class="photo-slot">
+          <div class="slot-label">📷 相遇页 — 圆形头像</div>
+          <div class="slot-preview" id="previewMeet" onclick="window._triggerPhoto('meet','photoMeet')">
+            ${meetHas?`<img src="${photos['meet']}" alt="相遇照片">`:'<span class="placeholder-icon">📷</span>'}
+          </div>
+          <div class="slot-actions">
+            <span class="btn-sm" onclick="window._triggerPhoto('meet','photoMeet')">${meetHas?'更换照片':'上传照片'}</span>
+            ${meetHas?'<span class="btn-sm danger" onclick="window._removePhoto(\'meet\',\'photoMeet\')">移除照片</span>':''}
+          </div>
+        </div>
+        <div class="photo-slot">
+          <div class="slot-label">📸 回忆页 — 时间轴照片</div>
+          <div class="slot-preview" id="previewTimeline" onclick="window._triggerPhoto('timeline','photoTimeline')">
+            ${tlHas?`<img src="${photos['timeline']}" alt="回忆照片">`:'<span class="placeholder-icon">📸</span>'}
+          </div>
+          <div class="slot-actions">
+            <span class="btn-sm" onclick="window._triggerPhoto('timeline','photoTimeline')">${tlHas?'更换照片':'上传照片'}</span>
+            ${tlHas?'<span class="btn-sm danger" onclick="window._removePhoto(\'timeline\',\'photoTimeline\')">移除照片</span>':''}
+          </div>
+        </div>
+      `;
+    }
+    else if(tab==='music'){
+      editorBody.innerHTML=`
+        <div class="music-section">
+          <div class="sec-label">🎵 当前音乐</div>
+          <div class="info-row">
+            ${musicName?`<strong>${musicName}</strong><br><span style="font-size:11px;opacity:0.6">${musicURL.substring(0,50)}...</span>`:'🌙 温柔和弦 (Web Audio 生成)'}
+          </div>
+          ${musicURL?`<audio controls src="${musicURL}" style="width:100%;height:32px;margin-top:8px;border-radius:8px;"></audio>`:''}
+        </div>
+        <div class="music-section">
+          <div class="sec-label">📁 上传音乐文件</div>
+          <div class="audio-upload-box" onclick="window._triggerAudio()">
+            <div class="icon">🎼</div>
+            <div class="text">点击上传音频</div>
+            <div class="hint">支持 MP3 / WAV / OGG 等格式</div>
+          </div>
+        </div>
+        <div class="music-section">
+          <div class="sec-label">🔗 或输入音乐链接</div>
+          <input type="text" id="musicURLInput" placeholder="https://example.com/music.mp3" value="${musicURL&&!musicURL.startsWith('blob:')?musicURL:''}">
+          <div class="btn-row">
+            <span class="btn-sm" onclick="window._applyMusicURL()">应用链接</span>
+          </div>
+        </div>
+        ${musicURL?`<div class="music-section"><span class="btn-sm danger" onclick="window._resetMusic()" style="display:block;text-align:center;">恢复默认音乐</span></div>`:''}
+      `;
+    }
+    else if(tab==='text'){
+      // 收集当前 DOM 文案到 texts
+      document.querySelectorAll('[data-edit]').forEach(el=>{
+        const key=el.dataset.edit;
+        if(key.startsWith('reason-')){
+          const numSpan=el.querySelector('.num');
+          const numHTML=numSpan?numSpan.outerHTML:'';
+          texts[key]=el.innerHTML.replace(numHTML,'').trim();
+        } else {
+          texts[key]=el.innerHTML;
+        }
+      });
+
+      const fields=[
+        {key:'cover-big',label:'封面大字',type:'input'},
+        {key:'cover-sub',label:'封面副标题',type:'input'},
+        {key:'cover-btn',label:'封面按钮文字',type:'input'},
+        {key:'meet-title',label:'相遇页标题',type:'input'},
+        {key:'meet-detail',label:'相遇页详情 (支持HTML)',type:'textarea'},
+        {key:'reasons-title',label:'心动页标题',type:'input'},
+        {key:'reason-1',label:'理由 1',type:'input'},
+        {key:'reason-2',label:'理由 2',type:'input'},
+        {key:'reason-3',label:'理由 3',type:'input'},
+        {key:'reason-4',label:'理由 4',type:'input'},
+        {key:'reason-5',label:'理由 5',type:'input'},
+        {key:'reason-6',label:'理由 6',type:'input'},
+        {key:'reason-7',label:'理由 7',type:'input'},
+        {key:'memories-title',label:'回忆页标题',type:'input'},
+        {key:'tl-date-1',label:'时间轴日期 1',type:'input'},
+        {key:'tl-text-1',label:'时间轴事件 1',type:'input'},
+        {key:'tl-date-2',label:'时间轴日期 2',type:'input'},
+        {key:'tl-text-2',label:'时间轴事件 2',type:'input'},
+        {key:'tl-date-3',label:'时间轴日期 3',type:'input'},
+        {key:'tl-text-3',label:'时间轴事件 3',type:'input'},
+        {key:'tl-date-4',label:'时间轴日期 4',type:'input'},
+        {key:'tl-text-4',label:'时间轴事件 4',type:'input'},
+        {key:'tl-date-5',label:'时间轴日期 5',type:'input'},
+        {key:'tl-text-5',label:'时间轴事件 5',type:'input'},
+        {key:'tl-date-6',label:'时间轴日期 6',type:'input'},
+        {key:'tl-text-6',label:'时间轴事件 6',type:'input'},
+        {key:'poem',label:'告白页诗文 (支持<br>)',type:'textarea'},
+        {key:'promise',label:'结尾页承诺文案 (支持<br>)',type:'textarea'},
+        {key:'will-btn',label:'结尾按钮文字',type:'input'},
+        {key:'toast-title',label:'弹窗标题',type:'input'},
+        {key:'toast-msg',label:'弹窗内容 (支持<br>)',type:'textarea'},
+      ];
+
+      let html='';
+      fields.forEach(f=>{
+        // 为 reason-* 取 texts 中的纯文本
+        let val=texts[f.key]||'';
+        if(val===''){
+          const el=document.querySelector(`[data-edit="${f.key}"]`);
+          if(el){
+            if(f.key.startsWith('reason-')){
+              const ns=el.querySelector('.num');
+              val=el.innerHTML.replace(ns?ns.outerHTML:'','').trim();
+            }else{val=el.innerHTML;}
+          }
+        }
+        html+=`<div class="text-field"><div class="field-label">${f.label}</div>`;
+        if(f.type==='textarea'){
+          html+=`<textarea data-edit-field="${f.key}" rows="3">${escHtml(val)}</textarea>`;
+        }else{
+          html+=`<input type="text" data-edit-field="${f.key}" value="${escHtml(val)}">`;
+        }
+        html+=`</div>`;
+      });
+      html+=`<button class="btn-primary" onclick="window._saveAllTexts()">💾 保存全部文案</button>`;
+      editorBody.innerHTML=html;
+    }
+  }
+
+  function escHtml(s){
+    if(!s)return'';
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // 暴露到 window
+  window._triggerPhoto=function(key,cid){triggerPhotoUpload(key,cid);};
+  window._removePhoto=function(key,cid){removePhoto(key,cid);};
+  window._triggerAudio=function(){triggerAudioUpload();};
+  window._applyMusicURL=function(){applyMusicURL();};
+  window._resetMusic=function(){resetMusic();};
+  window._saveAllTexts=function(){
+    document.querySelectorAll('[data-edit-field]').forEach(el=>{
+      texts[el.dataset.editField]=el.value;
+    });
+    saveTexts();loadAllTexts();renderTab('text');showToast();
+  };
+
+  // 初始渲染
+  renderTab('photos');
+
+  /* =========================================================
+     主循环
+     ========================================================= */
+  function loop(ts){
+    cX+=(mX-cX)*0.08;cY+=(mY-cY)*0.08;
+    glow.style.left=cX+'px';glow.style.top=cY+'px';
+    drawStars(ts);drawPetals(ts);
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
